@@ -211,6 +211,9 @@ class Handler(BaseHTTPRequestHandler):
         self._cors()
         self.end_headers()
 
+    def do_HEAD(self):
+        self.do_GET()
+
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
