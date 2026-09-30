@@ -1,0 +1,3340 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Memorize Lab</title>
+  <script>
+    // Apply theme before paint to avoid flash
+    (function () {
+      try {
+        var t = localStorage.getItem("ml_theme") || "dark";
+        document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    })();
+  </script>
+  <style>
+    :root, [data-theme="dark"] {
+      --bg: #0c0c0c;
+      --surface: #141414;
+      --surface2: #1a1a1a;
+      --surface3: #242424;
+      --border: #2e2e2e;
+      --border-light: #3a3a3a;
+      --text: #f2f2f2;
+      --text-dim: #9a9a9a;
+      --text-muted: #6e6e6e;
+      --accent: #f0f0f0;
+      --accent-soft: rgba(240, 240, 240, 0.1);
+      --accent-border: rgba(240, 240, 240, 0.28);
+      --success: #e0e0e0;
+      --success-soft: rgba(224, 224, 224, 0.12);
+      --warning: #b8b8b8;
+      --danger: #8a8a8a;
+      --danger-soft: rgba(138, 138, 138, 0.14);
+      --radius: 14px;
+      --font: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      --mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+    }
+    [data-theme="light"] {
+      --bg: #f4f4f5;
+      --surface: #ffffff;
+      --surface2: #f0f0f2;
+      --surface3: #e6e6ea;
+      --border: #d8d8de;
+      --border-light: #c4c4cc;
+      --text: #121214;
+      --text-dim: #5a5a64;
+      --text-muted: #8a8a96;
+      --accent: #18181b;
+      --accent-soft: rgba(24, 24, 27, 0.08);
+      --accent-border: rgba(24, 24, 27, 0.2);
+      --success: #18181b;
+      --success-soft: rgba(24, 24, 27, 0.08);
+      --warning: #52525b;
+      --danger: #71717a;
+      --danger-soft: rgba(113, 113, 122, 0.12);
+    }
+    [data-theme="light"] button.primary,
+    [data-theme="light"] .mode-tab.active,
+    [data-theme="light"] .logo-mark { color: #fafafa; }
+    [data-theme="light"] .bob-ball {
+      background: #18181b;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* subtle noise texture */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .app {
+      position: relative;
+      z-index: 1;
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 1.5rem 1.25rem 4rem;
+    }
+
+    /* ─── Header ─── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 2rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-weight: 600;
+      font-size: 1.1rem;
+      letter-spacing: -0.02em;
+    }
+
+    .logo-mark {
+      width: 28px;
+      height: 28px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      color: #0a0a0a;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+
+    .topbar-actions {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .user-chip {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      padding: 0.35rem 0.7rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+    }
+
+    /* Auth modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.72);
+      backdrop-filter: blur(6px);
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .modal-overlay.open {
+      display: flex;
+      animation: fadeUp 0.25s ease;
+    }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border-light);
+      border-radius: 16px;
+      padding: 1.75rem 1.5rem;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    .modal h2 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+      letter-spacing: -0.02em;
+    }
+    .modal .sub {
+      color: var(--text-dim);
+      font-size: 0.9rem;
+      margin-bottom: 1.25rem;
+    }
+    .field { margin-bottom: 0.85rem; }
+    .field label {
+      display: block;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      margin-bottom: 0.35rem;
+    }
+    .field input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.95rem;
+      padding: 0.7rem 0.85rem;
+    }
+    .field input:focus {
+      outline: none;
+      border-color: #888;
+    }
+    .auth-error {
+      color: #bbb;
+      font-size: 0.85rem;
+      margin-bottom: 0.75rem;
+      min-height: 1.2em;
+    }
+    .auth-switch {
+      text-align: center;
+      margin-top: 1rem;
+      font-size: 0.85rem;
+      color: var(--text-dim);
+    }
+    .auth-switch button {
+      background: none;
+      border: none;
+      color: #fff;
+      text-decoration: underline;
+      cursor: pointer;
+      padding: 0;
+      font-size: inherit;
+      box-shadow: none;
+    }
+    .auth-switch button:hover {
+      transform: none;
+      box-shadow: none;
+      background: none;
+    }
+
+    .library-grid { display: grid; gap: 0.75rem; }
+    .lib-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.1rem 1.2rem;
+      cursor: pointer;
+      transition: border-color 0.2s, box-shadow 0.25s, transform 0.2s;
+      text-align: left;
+      width: 100%;
+      display: block;
+    }
+    .lib-card:hover {
+      border-color: #4a4a4a;
+      box-shadow: 0 0 24px rgba(255,255,255,0.05);
+      transform: translateY(-2px);
+    }
+    .lib-card h3 {
+      font-size: 1rem;
+      font-weight: 560;
+      margin-bottom: 0.35rem;
+    }
+    .lib-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .lib-meta strong {
+      color: var(--text-dim);
+      font-weight: 560;
+    }
+    .lib-actions {
+      display: flex;
+      gap: 0.4rem;
+      margin-top: 0.75rem;
+    }
+    .empty-lib {
+      text-align: center;
+      padding: 2.5rem 1rem;
+      color: var(--text-muted);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+    }
+
+    .login-banner {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.15rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+    .login-banner p {
+      color: var(--text-dim);
+      font-size: 0.9rem;
+      flex: 1;
+      min-width: 200px;
+    }
+    .login-banner strong { color: var(--text); }
+
+    .settings-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .settings-section h3 {
+      font-size: 0.95rem;
+      margin-bottom: 0.75rem;
+    }
+    .theme-toggle {
+      display: flex;
+      gap: 0.5rem;
+    }
+    .theme-toggle button {
+      flex: 1;
+      justify-content: center;
+    }
+    .theme-toggle button.active {
+      background: var(--accent);
+      color: var(--bg);
+      border-color: var(--accent);
+    }
+    [data-theme="light"] .theme-toggle button.active {
+      color: #fafafa;
+    }
+
+    .admin-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    .admin-table th, .admin-table td {
+      text-align: left;
+      padding: 0.6rem 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .admin-table th { color: var(--text-muted); font-weight: 500; }
+    .stat-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+    .stat-pill {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.85rem 1.1rem;
+      min-width: 110px;
+    }
+    .stat-pill .n {
+      font-size: 1.4rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    .stat-pill .l {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    /* ─── Buttons ─── */
+    button, .btn {
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 500;
+      padding: 0.55rem 1rem;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      cursor: pointer;
+      transition:
+        background 0.2s ease,
+        border-color 0.2s ease,
+        box-shadow 0.25s ease,
+        transform 0.18s cubic-bezier(0.34, 1.4, 0.64, 1),
+        color 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    button::after, .btn::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(255,255,255,0.12), transparent 60%);
+      opacity: 0;
+      transition: opacity 0.25s ease;
+      pointer-events: none;
+    }
+
+    button:hover::after, .btn:hover::after {
+      opacity: 1;
+    }
+
+    button:hover, .btn:hover {
+      background: var(--surface3);
+      border-color: #4a4a4a;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 4px 20px rgba(0,0,0,0.35);
+      transform: translateY(-1px);
+    }
+
+    button:active, .btn:active {
+      transform: translateY(1px) scale(0.97);
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.04), inset 0 2px 8px rgba(0,0,0,0.4);
+      transition-duration: 0.08s;
+    }
+
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #0a0a0a;
+      box-shadow: 0 0 24px rgba(255,255,255,0.08);
+    }
+
+    button.primary:hover {
+      background: #ffffff;
+      border-color: #ffffff;
+      box-shadow: 0 0 32px rgba(255,255,255,0.22), 0 4px 16px rgba(0,0,0,0.3);
+      transform: translateY(-2px);
+    }
+
+    button.primary:active {
+      transform: translateY(1px) scale(0.97);
+      box-shadow: 0 0 12px rgba(255,255,255,0.1), inset 0 2px 6px rgba(0,0,0,0.25);
+    }
+
+    button.ghost {
+      background: transparent;
+      border-color: transparent;
+      color: var(--text-dim);
+    }
+
+    button.ghost:hover {
+      color: var(--text);
+      background: var(--surface2);
+      border-color: var(--border);
+      box-shadow: 0 0 16px rgba(255,255,255,0.04);
+    }
+
+    button:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      transform: none !important;
+      box-shadow: none !important;
+    }
+
+    button.danger-outline {
+      border-color: rgba(248,113,113,0.4);
+      color: var(--danger);
+    }
+
+    button.danger-outline:hover {
+      background: var(--danger-soft);
+    }
+
+    /* ─── Views ─── */
+    .view { display: none; animation: fadeUp 0.3s ease; }
+    .view.active { display: block; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ─── Upload / Home ─── */
+    .hero {
+      text-align: center;
+      padding: 2.5rem 0 2rem;
+    }
+
+    .hero h1 {
+      font-size: clamp(1.8rem, 5vw, 2.6rem);
+      font-weight: 600;
+      letter-spacing: -0.035em;
+      margin-bottom: 0.6rem;
+    }
+
+    .hero p {
+      color: var(--text-dim);
+      font-size: 1.05rem;
+      max-width: 420px;
+      margin: 0 auto 2rem;
+    }
+
+    .upload-zone {
+      background: var(--surface);
+      border: 1.5px dashed var(--border-light);
+      border-radius: var(--radius);
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      transition: border-color 0.25s, background 0.25s, box-shadow 0.3s, transform 0.2s;
+      cursor: pointer;
+      max-width: 560px;
+      margin: 0 auto 1.5rem;
+    }
+
+    .upload-zone:hover,
+    .upload-zone.dragover {
+      border-color: #888;
+      background: rgba(255,255,255,0.04);
+      box-shadow: 0 0 40px rgba(255,255,255,0.06), inset 0 0 40px rgba(255,255,255,0.02);
+      transform: translateY(-2px);
+    }
+
+    .upload-zone .icon {
+      font-size: 2rem;
+      margin-bottom: 0.75rem;
+      opacity: 0.7;
+    }
+
+    .upload-zone h3 {
+      font-size: 1rem;
+      font-weight: 560;
+      margin-bottom: 0.35rem;
+    }
+
+    .upload-zone p {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    .or-divider {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      max-width: 560px;
+      margin: 0 auto 1.5rem;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+
+    .or-divider::before,
+    .or-divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    textarea#paste-input {
+      width: 100%;
+      max-width: 560px;
+      margin: 0 auto;
+      display: block;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.95rem;
+      padding: 1rem 1.15rem;
+      min-height: 140px;
+      resize: vertical;
+      line-height: 1.55;
+      transition: border-color 0.2s;
+    }
+
+    textarea#paste-input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    textarea#paste-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .paste-actions {
+      max-width: 560px;
+      margin: 1rem auto 0;
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.5rem;
+    }
+
+    /* ─── Dashboard (after load) ─── */
+    .dash-header {
+      margin-bottom: 1.75rem;
+    }
+
+    .dash-header h2 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.25rem;
+    }
+
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      margin-top: 0.5rem;
+    }
+
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .meta-item strong {
+      color: var(--text);
+      font-weight: 560;
+    }
+
+    /* Mode tabs */
+    .mode-tabs {
+      display: flex;
+      gap: 0.35rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      padding: 0.3rem;
+      margin-bottom: 1.5rem;
+      overflow-x: auto;
+    }
+
+    .mode-tab {
+      flex: 1;
+      min-width: max-content;
+      padding: 0.6rem 1rem;
+      border: none;
+      background: transparent;
+      color: var(--text-dim);
+      border-radius: 8px;
+      font-weight: 500;
+      font-size: 0.85rem;
+      box-shadow: none;
+      transform: none;
+    }
+
+    .mode-tab::after { display: none; }
+
+    .mode-tab:hover {
+      color: var(--text);
+      background: var(--surface3);
+      box-shadow: inset 0 0 20px rgba(255,255,255,0.04);
+      transform: none;
+    }
+
+    .mode-tab:active {
+      transform: scale(0.97);
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.35);
+    }
+
+    .mode-tab.active {
+      background: var(--accent);
+      color: #0a0a0a;
+      box-shadow: 0 0 20px rgba(255,255,255,0.12);
+    }
+
+    .train-sub {
+      font-size: 0.8rem !important;
+      padding: 0.45rem 0.75rem !important;
+    }
+    .train-sub.active {
+      background: var(--accent) !important;
+      color: var(--bg) !important;
+      border-color: var(--accent) !important;
+    }
+    [data-theme="light"] .train-sub.active {
+      color: #fafafa !important;
+    }
+    .miss-word {
+      outline: 2px solid rgba(255,255,255,0.35);
+      outline-offset: 2px;
+      border-radius: 3px;
+    }
+    [data-theme="light"] .miss-word {
+      outline-color: rgba(0,0,0,0.35);
+      background: rgba(0,0,0,0.06);
+    }
+    .streak-bar {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      margin-bottom: 0.75rem;
+    }
+
+    .mode-tab.active:hover {
+      background: #fff;
+      color: #0a0a0a;
+      transform: none;
+    }
+
+    /* Panels */
+    .panel { display: none; }
+    .panel.active { display: block; animation: fadeUp 0.25s ease; }
+
+    /* Study panel */
+    .text-display {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem 1.35rem;
+      font-size: 1.05rem;
+      line-height: 1.75;
+      max-height: 420px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .text-display .para {
+      margin-bottom: 1.1rem;
+    }
+
+    .text-display .para:last-child { margin-bottom: 0; }
+
+    .text-display .highlight-word {
+      background: var(--accent-soft);
+      border-radius: 3px;
+      padding: 0 2px;
+    }
+
+    /* Chunks */
+    .chunks-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .chunk-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      padding: 1rem 1.15rem;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s, box-shadow 0.25s, transform 0.2s;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.85rem;
+    }
+
+    .chunk-card:hover {
+      border-color: #4a4a4a;
+      background: var(--surface2);
+      box-shadow: 0 0 24px rgba(255,255,255,0.05), 0 6px 20px rgba(0,0,0,0.25);
+      transform: translateY(-2px);
+    }
+
+    .chunk-card:active {
+      transform: translateY(0) scale(0.99);
+      box-shadow: inset 0 2px 10px rgba(0,0,0,0.3);
+    }
+
+    .chunk-card.mastered {
+      border-color: rgba(52, 211, 153, 0.35);
+    }
+
+    .chunk-num {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      background: var(--surface3);
+      display: grid;
+      place-items: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+
+    .chunk-card.mastered .chunk-num {
+      background: var(--success-soft);
+      color: var(--success);
+    }
+
+    .chunk-body {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .chunk-preview {
+      font-size: 0.9rem;
+      color: var(--text-dim);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .chunk-status {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.3rem;
+    }
+
+    .chunk-card.mastered .chunk-status {
+      color: var(--success);
+    }
+
+    /* Hide / progressive practice */
+    .practice-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      align-items: center;
+    }
+
+    .practice-controls label {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 120px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      background: var(--accent);
+      border-radius: 50%;
+      cursor: pointer;
+    }
+
+    .hidden-text {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem 1.35rem;
+      font-size: 1.05rem;
+      line-height: 1.8;
+      min-height: 200px;
+    }
+
+    .word-blank {
+      display: inline-block;
+      min-width: 3.2em;
+      border-bottom: 2px solid var(--border-light);
+      color: transparent;
+      user-select: none;
+      margin: 0 1px;
+      border-radius: 2px;
+      transition: all 0.15s;
+    }
+
+    .word-blank.revealed {
+      color: var(--text);
+      font-weight: 650;
+      border-bottom-color: transparent;
+      background: var(--accent-soft);
+      padding: 0 3px;
+    }
+
+    .word-blank.correct-reveal {
+      color: var(--text);
+      font-weight: 650;
+      background: var(--success-soft);
+      border-bottom-color: transparent;
+    }
+
+    [data-theme="light"] .word-blank {
+      border-bottom-color: #a1a1aa;
+    }
+    [data-theme="light"] .word-blank.revealed,
+    [data-theme="light"] .word-blank.correct-reveal {
+      color: #09090b;
+      background: rgba(24, 24, 27, 0.1);
+    }
+    [data-theme="light"] .hidden-text {
+      color: #18181b;
+    }
+
+    /* Voice / Recite panel */
+    .voice-status {
+      text-align: center;
+      padding: 1.5rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 1.25rem;
+    }
+
+    .mic-btn {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      background: var(--surface2);
+      display: grid;
+      place-items: center;
+      margin: 0 auto 1rem;
+      font-size: 1.6rem;
+      transition: border-color 0.25s, background 0.25s, box-shadow 0.3s, transform 0.2s;
+      cursor: pointer;
+      box-shadow: none;
+    }
+
+    .mic-btn::after { display: none; }
+
+    .mic-btn:hover {
+      border-color: #888;
+      background: rgba(255,255,255,0.06);
+      box-shadow: 0 0 30px rgba(255,255,255,0.1);
+      transform: scale(1.06);
+    }
+
+    .mic-btn:active {
+      transform: scale(0.94);
+      box-shadow: inset 0 2px 12px rgba(0,0,0,0.4);
+    }
+
+    .mic-btn.listening {
+      border-color: #ccc;
+      background: rgba(255,255,255,0.08);
+      animation: pulse 1.4s ease infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.25); }
+      50% { box-shadow: 0 0 0 16px rgba(255, 255, 255, 0); }
+    }
+
+    .voice-hint {
+      color: var(--text-dim);
+      font-size: 0.9rem;
+    }
+
+    .voice-hint strong {
+      color: var(--text);
+    }
+
+    .transcript-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.15rem;
+      margin-bottom: 1rem;
+      min-height: 100px;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      color: var(--text-dim);
+    }
+
+    .transcript-box.has-content {
+      color: var(--text);
+    }
+
+    .transcript-box .match { color: var(--success); }
+    .transcript-box .miss { color: var(--danger); text-decoration: underline; text-underline-offset: 2px; }
+    .transcript-box .extra { color: var(--warning); opacity: 0.8; }
+
+    .score-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .score-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .score-card .val {
+      font-size: 1.6rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .score-card .lbl {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+    }
+
+    .score-card.good .val { color: var(--success); }
+    .score-card.mid .val { color: var(--warning); }
+    .score-card.bad .val { color: var(--danger); }
+
+    /* Target text (cue-free means hidden until after) */
+    .target-toggle {
+      margin-bottom: 1rem;
+    }
+
+    .target-preview {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem;
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: var(--text-dim);
+      max-height: 160px;
+      overflow-y: auto;
+      display: none;
+      margin-top: 0.6rem;
+    }
+
+    .target-preview.show { display: block; }
+
+    /* Progress bar overall */
+    .overall-progress {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.15rem 1.25rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .overall-progress .label-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .overall-progress .label-row span:last-child {
+      color: var(--accent);
+      font-weight: 560;
+    }
+
+    .bar-track {
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #888, var(--accent));
+      border-radius: 3px;
+      width: 0%;
+      transition: width 0.4s ease;
+    }
+
+    /* Empty / no speech support */
+    .notice {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.15rem;
+      font-size: 0.9rem;
+      color: var(--text-dim);
+      margin-bottom: 1rem;
+    }
+
+    .notice.warn {
+      border-color: rgba(251, 191, 36, 0.35);
+      background: rgba(251, 191, 36, 0.06);
+    }
+
+    /* Footer tip */
+    .tip {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      margin-top: 2.5rem;
+    }
+
+    /* ─── Pace / bobbing ball ─── */
+    .pace-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+      margin-bottom: 1.25rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.85rem 1rem;
+    }
+
+    .pace-controls label {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+
+    .pace-controls .wpm-val {
+      color: var(--accent);
+      font-weight: 600;
+      min-width: 2.5em;
+    }
+
+    #pace-mic-btn.listening {
+      border-color: #ccc;
+      background: rgba(255,255,255,0.1);
+      box-shadow: 0 0 20px rgba(255,255,255,0.15);
+      animation: pulse 1.4s ease infinite;
+    }
+
+    .pace-stage {
+      position: relative;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2.25rem 1.35rem 1.5rem;
+      min-height: 220px;
+      max-height: 420px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      scroll-behavior: smooth;
+    }
+
+    .pace-stage::-webkit-scrollbar {
+      width: 6px;
+    }
+    .pace-stage::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .pace-stage::-webkit-scrollbar-thumb {
+      background: #333;
+      border-radius: 3px;
+    }
+    .pace-stage::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+
+    .pace-text {
+      font-size: 1.15rem;
+      line-height: 2.1;
+      position: relative;
+    }
+
+    .pace-word {
+      display: inline;
+      position: relative;
+      padding: 0.1em 0.12em;
+      border-radius: 4px;
+      transition: background 0.15s, color 0.15s, transform 0.15s;
+    }
+
+    /* Pre-marked emphasis (always slightly stronger) */
+    .pace-word.emphasize {
+      font-weight: 650;
+      color: var(--text);
+      letter-spacing: 0.01em;
+      text-shadow: none;
+    }
+
+    .pace-word.current {
+      background: var(--accent-soft);
+      color: var(--text);
+      font-weight: 600;
+      box-shadow: 0 0 12px var(--accent-soft);
+    }
+
+    .pace-word.current.emphasize {
+      background: var(--accent-soft);
+      box-shadow: 0 0 16px var(--accent-soft);
+      animation: word-shake 0.45s ease-in-out;
+    }
+
+    [data-theme="light"] .pace-word.emphasize {
+      color: #09090b;
+      font-weight: 700;
+    }
+    [data-theme="light"] .pace-word.current,
+    [data-theme="light"] .pace-word.current.emphasize {
+      color: #09090b;
+      background: rgba(24, 24, 27, 0.12);
+    }
+    [data-theme="light"] .pace-word.done.emphasize {
+      color: #3f3f46;
+    }
+
+    @keyframes word-shake {
+      0%, 100% { transform: translateX(0) scale(1.04); }
+      20% { transform: translateX(-2px) scale(1.06); }
+      40% { transform: translateX(3px) scale(1.06); }
+      60% { transform: translateX(-2px) scale(1.05); }
+      80% { transform: translateX(1px) scale(1.04); }
+    }
+
+    .pace-word.done {
+      color: var(--text-muted);
+      text-shadow: none;
+    }
+
+    .pace-word.done.emphasize {
+      color: #7a7a7a;
+      font-weight: 600;
+    }
+
+    /* Pause marker in text */
+    .pace-pause-mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 0;
+      height: 0;
+      position: relative;
+      vertical-align: middle;
+    }
+
+    /* Floating pause timer next to ball */
+    .pause-timer {
+      position: absolute;
+      z-index: 6;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      transform: translate(-50%, -100%);
+    }
+
+    .pause-timer.visible {
+      opacity: 1;
+    }
+
+    .pause-ring {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: conic-gradient(#fff var(--pct, 0%), #333 0);
+      display: grid;
+      place-items: center;
+      box-shadow: 0 0 16px rgba(255,255,255,0.2);
+    }
+
+    .pause-ring-inner {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--surface);
+      display: grid;
+      place-items: center;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: #fff;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .pause-label {
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      background: rgba(0,0,0,0.65);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    /* Bobbing ball */
+    .bob-ball {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow:
+        0 0 8px rgba(255,255,255,0.7),
+        0 0 20px rgba(255,255,255,0.35),
+        0 0 40px rgba(255,255,255,0.12);
+      pointer-events: none;
+      z-index: 5;
+      transform: translate(-50%, -120%);
+      opacity: 0;
+      transition: left 0.1s linear, top 0.1s linear, opacity 0.2s;
+    }
+
+    .bob-ball.visible {
+      opacity: 1;
+      animation: bob 0.5s ease-in-out infinite;
+    }
+
+    .bob-ball.pausing {
+      animation: none;
+      transform: translate(-50%, -120%) scale(1.3);
+      box-shadow:
+        0 0 12px rgba(255,255,255,0.9),
+        0 0 28px rgba(255,255,255,0.4);
+    }
+
+    @keyframes bob {
+      0%, 100% { transform: translate(-50%, -120%) translateY(0); }
+      50% { transform: translate(-50%, -120%) translateY(-8px); }
+    }
+
+    .pace-status {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.85rem;
+      text-align: center;
+    }
+
+    .pace-status strong {
+      color: var(--text-dim);
+    }
+
+    .pace-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 1.25rem;
+      justify-content: center;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.75rem;
+    }
+
+    .pace-legend span {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+      background: #fff;
+      box-shadow: 0 0 6px rgba(255,255,255,0.4);
+    }
+
+    .legend-dot.pause {
+      border-radius: 50%;
+      background: transparent;
+      border: 2px solid #888;
+      box-shadow: none;
+    }
+
+    /* Responsive */
+    @media (max-width: 560px) {
+      .score-grid { grid-template-columns: 1fr; }
+      .mode-tabs { flex-wrap: nowrap; }
+      .app { padding: 1rem 0.9rem 3rem; }
+      .pace-text { font-size: 1.05rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Top bar -->
+    <div class="topbar">
+      <div class="logo">
+        <div class="logo-mark">M</div>
+        Memorize Lab
+      </div>
+      <div class="topbar-actions">
+        <button class="ghost" id="btn-library" style="display:none" onclick="showLibrary()">Library</button>
+        <button class="ghost" id="btn-admin" style="display:none" onclick="showAdmin()">Admin</button>
+        <button class="ghost" id="btn-settings" onclick="showSettings()">Settings</button>
+        <button class="ghost" id="btn-new" style="display:none" onclick="goHome()">New text</button>
+        <span class="user-chip" id="user-chip" style="display:none"></span>
+        <button class="ghost" id="btn-logout" style="display:none" onclick="logout()">Log out</button>
+        <button id="btn-login" onclick="openAuth('login')">Log in</button>
+        <button class="primary" id="btn-signup" onclick="openAuth('signup')">Sign up</button>
+      </div>
+    </div>
+
+    <!-- Auth modal -->
+    <div class="modal-overlay" id="auth-modal">
+      <div class="modal">
+        <h2 id="auth-title">Log in</h2>
+        <p class="sub" id="auth-sub">Access your saved texts and scores.</p>
+        <div class="auth-error" id="auth-error"></div>
+        <div class="field" id="field-username" style="display:none">
+          <label>Username</label>
+          <input id="auth-username" autocomplete="username" placeholder="at least 3 characters" />
+        </div>
+        <div class="field">
+          <label id="label-login">Username or email</label>
+          <input id="auth-login" autocomplete="username" placeholder="you@email.com" />
+        </div>
+        <div class="field" id="field-email" style="display:none">
+          <label>Email</label>
+          <input id="auth-email" type="email" autocomplete="email" placeholder="you@email.com" />
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input id="auth-password" type="password" autocomplete="current-password" placeholder="at least 6 characters" />
+        </div>
+        <button class="primary" style="width:100%" id="auth-submit" onclick="submitAuth()">Continue</button>
+        <div class="auth-switch" id="auth-switch"></div>
+      </div>
+    </div>
+
+    <!-- VIEW: Library -->
+    <div class="view" id="view-library">
+      <div class="dash-header">
+        <h2>Your library</h2>
+        <p style="color:var(--text-dim); font-size:0.95rem; margin-top:0.25rem">Saved texts — sorted with review priority. Streak and due items help spaced practice.</p>
+      </div>
+      <div style="margin-bottom:1.25rem;display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center">
+        <button class="primary" onclick="goHome()">+ New text</button>
+        <button id="lib-filter-all" class="primary" onclick="libraryFilter='all';showLibrary()">All</button>
+        <button id="lib-filter-due" onclick="libraryFilter='due';showLibrary()">Due today</button>
+        <span class="streak-bar" id="lib-streak"></span>
+      </div>
+      <div class="library-grid" id="library-grid">
+        <div class="empty-lib">Loading…</div>
+      </div>
+    </div>
+
+    <!-- VIEW: Settings -->
+    <div class="view" id="view-settings">
+      <div class="dash-header">
+        <h2>Settings</h2>
+        <p style="color:var(--text-dim); font-size:0.95rem; margin-top:0.25rem">Appearance and account.</p>
+      </div>
+      <div class="settings-section">
+        <h3>Theme</h3>
+        <div class="theme-toggle">
+          <button id="theme-dark" onclick="setTheme('dark')">Dark</button>
+          <button id="theme-light" onclick="setTheme('light')">Light</button>
+        </div>
+      </div>
+      <div class="settings-section" id="settings-account">
+        <h3>Account</h3>
+        <p id="settings-account-info" style="color:var(--text-dim); font-size:0.9rem; margin-bottom:0.75rem">Not signed in.</p>
+        <button id="settings-login-btn" onclick="openAuth('login')">Log in</button>
+        <div id="settings-password" style="display:none; margin-top:1rem">
+          <h3 style="margin-bottom:0.5rem">Change password</h3>
+          <div class="field"><label>Current password</label><input type="password" id="pw-old" /></div>
+          <div class="field"><label>New password</label><input type="password" id="pw-new" /></div>
+          <button onclick="changePassword()">Update password</button>
+          <p id="pw-msg" style="font-size:0.85rem;color:var(--text-dim);margin-top:0.5rem"></p>
+        </div>
+      </div>
+      <div class="settings-section">
+        <h3>Keyboard shortcuts</h3>
+        <p style="color:var(--text-dim); font-size:0.9rem; line-height:1.7">
+          <strong>Space</strong> — play / pause pace guide<br/>
+          <strong>M</strong> — toggle speak-along mic (pace)<br/>
+          <strong>R</strong> — reset pace<br/>
+          <strong>?</strong> — show this help
+        </p>
+      </div>
+      <div class="settings-section">
+        <h3>About</h3>
+        <p style="color:var(--text-dim); font-size:0.9rem">Memorize Lab — pace, emphasis, voice scoring, spaced review. Practice as a guest; sign in to save.</p>
+      </div>
+    </div>
+
+    <!-- VIEW: Admin (admin accounts only) -->
+    <div class="view" id="view-admin">
+      <div class="dash-header">
+        <h2>Admin dashboard</h2>
+        <p style="color:var(--text-dim); font-size:0.95rem; margin-top:0.25rem">Accounts, usage, and performance — only visible to admins.</p>
+      </div>
+      <div class="stat-pills" id="admin-stats"></div>
+      <div class="settings-section">
+        <h3>Top users by practice</h3>
+        <div style="overflow-x:auto">
+          <table class="admin-table" id="admin-top-users">
+            <thead><tr><th>User</th><th>Attempts</th><th>Avg accuracy</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="settings-section">
+        <h3>Recent scores</h3>
+        <div style="overflow-x:auto">
+          <table class="admin-table" id="admin-recent">
+            <thead><tr><th>When</th><th>User</th><th>Text</th><th>Mode</th><th>Accuracy</th><th>Clarity</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="settings-section">
+        <h3>All accounts</h3>
+        <div style="overflow-x:auto">
+          <table class="admin-table" id="admin-users">
+            <thead><tr><th>ID</th><th>Username</th><th>Email</th><th>Role</th><th>Joined</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW: Home / Upload -->
+    <div class="view active" id="view-home">
+      <div class="login-banner" id="login-banner">
+        <p><strong>Practice free as a guest.</strong> Sign in only when you want to save texts, scores, and mastery.</p>
+        <div style="display:flex; gap:0.5rem">
+          <button onclick="openAuth('login')">Log in</button>
+          <button class="primary" onclick="openAuth('signup')">Sign up</button>
+        </div>
+      </div>
+      <div class="hero">
+        <h1>Learn any text by heart</h1>
+        <p>Upload or paste. Pace guide, hide words, voice check. Progress saves when you’re signed in.</p>
+      </div>
+
+      <div class="upload-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+        <div class="icon">📄</div>
+        <h3>Drop a .txt file here</h3>
+        <p>or click to browse</p>
+        <input type="file" id="file-input" accept=".txt,text/plain" hidden />
+      </div>
+
+      <div class="or-divider">or paste text</div>
+
+      <textarea id="paste-input" placeholder="Paste the full text you want to memorize…"></textarea>
+      <div class="paste-actions">
+        <button class="primary" onclick="loadFromPaste()">Start practicing →</button>
+      </div>
+    </div>
+
+    <!-- VIEW: Dashboard -->
+    <div class="view" id="view-dash">
+      <div class="dash-header">
+        <h2 id="text-title">Untitled text</h2>
+        <div class="meta-row">
+          <div class="meta-item"><strong id="meta-words">0</strong> words</div>
+          <div class="meta-item"><strong id="meta-paras">0</strong> sections</div>
+          <div class="meta-item">~<strong id="meta-mins">0</strong> min read</div>
+        </div>
+      </div>
+
+      <div class="overall-progress">
+        <div class="label-row">
+          <span>Mastery</span>
+          <span id="mastery-pct">0%</span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill" id="mastery-bar"></div>
+        </div>
+      </div>
+
+      <div class="mode-tabs" id="mode-tabs">
+        <button class="mode-tab active" data-mode="study" onclick="setMode('study')">Study</button>
+        <button class="mode-tab" data-mode="train" onclick="setMode('train')">Train</button>
+        <button class="mode-tab" data-mode="hide" onclick="setMode('hide')">Hide words</button>
+        <button class="mode-tab" data-mode="pace" onclick="setMode('pace')">Pace guide</button>
+        <button class="mode-tab" data-mode="chunks" onclick="setMode('chunks')">Sections</button>
+        <button class="mode-tab" data-mode="voice" onclick="setMode('voice')">Voice test</button>
+      </div>
+
+      <!-- Study -->
+      <div class="panel active" id="panel-study">
+        <div id="study-meta" style="font-size:0.85rem;color:var(--text-dim);margin-bottom:0.75rem"></div>
+        <div class="text-display" id="study-text"></div>
+      </div>
+
+      <!-- Train (learning modes) -->
+      <div class="panel" id="panel-train">
+        <div class="practice-controls" style="flex-wrap:wrap">
+          <button class="train-sub active" data-sub="sentence" onclick="setTrainSub('sentence')">Sentences</button>
+          <button class="train-sub" data-sub="letters" onclick="setTrainSub('letters')">First letters</button>
+          <button class="train-sub" data-sub="recall" onclick="setTrainSub('recall')">Recall quiz</button>
+          <button class="train-sub" data-sub="reverse" onclick="setTrainSub('reverse')">Reverse</button>
+          <button class="train-sub" data-sub="path" onclick="setTrainSub('path')">Difficulty path</button>
+          <button class="train-sub" data-sub="drill" onclick="setTrainSub('drill')">Error drill</button>
+        </div>
+        <div id="train-status" style="font-size:0.9rem;color:var(--text-dim);margin:0.75rem 0"></div>
+        <div class="text-display" id="train-display" style="min-height:120px"></div>
+        <div id="train-actions" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:1rem"></div>
+        <div id="train-feedback" style="margin-top:0.75rem;font-size:0.9rem;color:var(--text-dim)"></div>
+      </div>
+
+      <!-- Hide words -->
+      <div class="panel" id="panel-hide">
+        <div class="practice-controls">
+          <label>
+            Hide
+            <input type="range" id="hide-level" min="0" max="90" value="40" oninput="applyHide()" />
+            <span id="hide-pct">40%</span>
+          </label>
+          <button onclick="revealAll()">Reveal all</button>
+          <button onclick="applyHide()">Shuffle hide</button>
+        </div>
+        <div class="hidden-text" id="hide-text"></div>
+        <p class="tip" style="margin-top:1rem">Click a blank to reveal that word. Aim to fill them from memory.</p>
+      </div>
+
+      <!-- Pace guide (bobbing ball + voice) -->
+      <div class="panel" id="panel-pace">
+        <div class="pace-controls">
+          <button class="primary" id="pace-play-btn" onclick="togglePace()">▶ Play</button>
+          <button onclick="resetPace()">Reset</button>
+          <button id="pace-mic-btn" onclick="togglePaceMic()" title="Speak along — voice check">🎤 Speak along</button>
+          <label>
+            Speed
+            <input type="range" id="pace-wpm" min="80" max="180" value="130" oninput="updateWpmLabel()" />
+            <span class="wpm-val" id="wpm-label">130</span> WPM
+          </label>
+        </div>
+        <div class="pace-stage" id="pace-stage">
+          <div class="bob-ball" id="bob-ball"></div>
+          <div class="pause-timer" id="pause-timer">
+            <div class="pause-ring" id="pause-ring">
+              <div class="pause-ring-inner" id="pause-secs">0.0</div>
+            </div>
+            <div class="pause-label">pause</div>
+          </div>
+          <div class="pace-text" id="pace-text"></div>
+        </div>
+        <div class="pace-status" id="pace-status">
+          Press <strong>Play</strong> and optionally <strong>Speak along</strong>. Follow the ball, stress bright words, hold pauses — your voice is scored at the end.
+        </div>
+        <div class="pace-legend">
+          <span><span class="legend-dot"></span> Emphasize (stress &amp; project)</span>
+          <span><span class="legend-dot pause"></span> Pause (breathe, then continue)</span>
+        </div>
+
+        <div id="pace-voice-panel" style="margin-top:1.25rem; display:none">
+          <div class="transcript-box" id="pace-transcript">Listening for your speech…</div>
+          <div class="score-grid" id="pace-score-grid" style="display:none; margin-top:0.75rem">
+            <div class="score-card" id="pace-sc-acc">
+              <div class="val">—</div>
+              <div class="lbl">Accuracy</div>
+            </div>
+            <div class="score-card" id="pace-sc-cov">
+              <div class="val">—</div>
+              <div class="lbl">Coverage</div>
+            </div>
+            <div class="score-card" id="pace-sc-clr">
+              <div class="val">—</div>
+              <div class="lbl">Clarity</div>
+            </div>
+          </div>
+          <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.75rem">
+            <button class="primary" id="pace-score-btn" onclick="scorePaceSpeech()" disabled>Score now</button>
+            <button onclick="clearPaceTranscript()">Clear speech</button>
+          </div>
+        </div>
+
+        <p class="tip" style="margin-top:0.75rem">
+          ~120–140 WPM is clear and natural. Turn on Speak along to check articulation while you follow the guide.
+        </p>
+      </div>
+
+      <!-- Chunks -->
+      <div class="panel" id="panel-chunks">
+        <div class="chunks-list" id="chunks-list"></div>
+      </div>
+
+      <!-- Voice -->
+      <div class="panel" id="panel-voice">
+        <div class="notice warn" id="speech-notice" style="display:none">
+          Speech recognition needs Chrome, Edge, or Safari. Grant mic permission when asked.
+        </div>
+
+        <div class="target-toggle">
+          <button class="ghost" onclick="toggleTarget()">Show / hide target text</button>
+          <div class="target-preview" id="target-preview"></div>
+        </div>
+
+        <div class="voice-status">
+          <button class="mic-btn" id="mic-btn" onclick="toggleListen()" title="Start / stop listening">🎤</button>
+          <div class="voice-hint" id="voice-hint">
+            <strong>Cue-free mode.</strong> Hide the text, then speak the whole piece from memory.
+          </div>
+        </div>
+
+        <div class="transcript-box" id="transcript-box">Your speech will appear here…</div>
+
+        <div class="score-grid" id="score-grid" style="display:none">
+          <div class="score-card" id="sc-acc">
+            <div class="val">—</div>
+            <div class="lbl">Accuracy</div>
+          </div>
+          <div class="score-card" id="sc-cov">
+            <div class="val">—</div>
+            <div class="lbl">Coverage</div>
+          </div>
+          <div class="score-card" id="sc-clr">
+            <div class="val">—</div>
+            <div class="lbl">Clarity</div>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap">
+          <button class="primary" onclick="scoreSpeech()" id="btn-score" disabled>Score this attempt</button>
+          <button onclick="clearTranscript()">Clear</button>
+          <button class="danger-outline" onclick="markMasteredFromVoice()" id="btn-master" style="display:none">Mark as mastered</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ─── API / Auth ───
+    const API = "";  // same origin when served by backend
+    let authToken = localStorage.getItem("ml_token") || null;
+    let currentUser = null;
+    let currentTextId = null;  // server id of active text
+    let authMode = "login";
+
+    async function api(path, opts = {}) {
+      const headers = { "Content-Type": "application/json", ...(opts.headers || {}) };
+      if (authToken) headers["Authorization"] = "Bearer " + authToken;
+      let res;
+      try {
+        res = await fetch(API + path, { ...opts, headers });
+      } catch (e) {
+        throw new Error("Cannot reach server. Check your connection and try again.");
+      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || ("Request failed (" + res.status + ")"));
+      return data;
+    }
+
+    function setTheme(theme) {
+      theme = theme === "light" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", theme);
+      try { localStorage.setItem("ml_theme", theme); } catch (_) {}
+      const darkBtn = document.getElementById("theme-dark");
+      const lightBtn = document.getElementById("theme-light");
+      if (darkBtn) darkBtn.classList.toggle("active", theme === "dark");
+      if (lightBtn) lightBtn.classList.toggle("active", theme === "light");
+    }
+
+    function setAuthUI() {
+      const logged = !!currentUser;
+      document.getElementById("btn-login").style.display = logged ? "none" : "inline-flex";
+      document.getElementById("btn-signup").style.display = logged ? "none" : "inline-flex";
+      document.getElementById("btn-logout").style.display = logged ? "inline-flex" : "none";
+      document.getElementById("btn-library").style.display = logged ? "inline-flex" : "none";
+      document.getElementById("btn-admin").style.display = (logged && currentUser.is_admin) ? "inline-flex" : "none";
+      const banner = document.getElementById("login-banner");
+      if (banner) banner.style.display = logged ? "none" : "flex";
+      const chip = document.getElementById("user-chip");
+      if (logged) {
+        chip.style.display = "inline-flex";
+        chip.textContent = currentUser.is_admin ? currentUser.username + " · admin" : currentUser.username;
+      } else {
+        chip.style.display = "none";
+      }
+      // settings account block
+      const info = document.getElementById("settings-account-info");
+      const sbtn = document.getElementById("settings-login-btn");
+      if (info && sbtn) {
+        if (logged) {
+          info.textContent = currentUser.username + " · " + currentUser.email +
+            (currentUser.is_admin ? " (admin)" : "");
+          sbtn.style.display = "none";
+          const pw = document.getElementById("settings-password");
+          if (pw) pw.style.display = "block";
+        } else {
+          info.textContent = "Not signed in — you can still practice as a guest.";
+          sbtn.style.display = "inline-flex";
+          const pw = document.getElementById("settings-password");
+          if (pw) pw.style.display = "none";
+        }
+      }
+      setTheme(localStorage.getItem("ml_theme") || "dark");
+    }
+
+    async function changePassword() {
+      const msg = document.getElementById("pw-msg");
+      msg.textContent = "";
+      try {
+        await api("/api/password", {
+          method: "POST",
+          body: JSON.stringify({
+            old_password: document.getElementById("pw-old").value,
+            new_password: document.getElementById("pw-new").value,
+          }),
+        });
+        msg.textContent = "Password updated.";
+        document.getElementById("pw-old").value = "";
+        document.getElementById("pw-new").value = "";
+      } catch (e) {
+        msg.textContent = e.message;
+      }
+    }
+
+    async function tryRestoreSession() {
+      if (!authToken) { setAuthUI(); return; }
+      try {
+        currentUser = await api("/api/me");
+        setAuthUI();
+      } catch {
+        authToken = null;
+        localStorage.removeItem("ml_token");
+        currentUser = null;
+        setAuthUI();
+      }
+    }
+
+    function openAuth(mode) {
+      authMode = mode;
+      document.getElementById("auth-error").textContent = "";
+      document.getElementById("auth-modal").classList.add("open");
+      const isSignup = mode === "signup";
+      document.getElementById("auth-title").textContent = isSignup ? "Create account" : "Log in";
+      document.getElementById("auth-sub").textContent = isSignup
+        ? "Save texts, scores, and mastery across devices."
+        : "Access your saved texts and scores.";
+      document.getElementById("field-username").style.display = isSignup ? "block" : "none";
+      document.getElementById("field-email").style.display = isSignup ? "block" : "none";
+      const loginField = document.getElementById("auth-login").closest(".field");
+      if (loginField) loginField.style.display = isSignup ? "none" : "block";
+      document.getElementById("auth-switch").innerHTML = isSignup
+        ? 'Already have an account? <button type="button" onclick="openAuth(\'login\')">Log in</button>'
+        : 'New here? <button type="button" onclick="openAuth(\'signup\')">Sign up</button>';
+      document.getElementById("auth-submit").textContent = isSignup ? "Sign up" : "Log in";
+      document.getElementById("auth-password").value = "";
+      setTimeout(() => {
+        const el = isSignup
+          ? document.getElementById("auth-username")
+          : document.getElementById("auth-login");
+        if (el) el.focus();
+      }, 50);
+    }
+
+    function closeAuth() {
+      document.getElementById("auth-modal").classList.remove("open");
+    }
+
+    document.getElementById("auth-modal").addEventListener("click", (e) => {
+      if (e.target.id === "auth-modal") closeAuth();
+    });
+
+    document.getElementById("auth-password").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") submitAuth();
+    });
+
+    async function submitAuth() {
+      const err = document.getElementById("auth-error");
+      err.textContent = "";
+      const btn = document.getElementById("auth-submit");
+      btn.disabled = true;
+      try {
+        let data;
+        if (authMode === "signup") {
+          const username = document.getElementById("auth-username").value.trim();
+          const email = document.getElementById("auth-email").value.trim();
+          const password = document.getElementById("auth-password").value;
+          if (username.length < 3) throw new Error("Username must be at least 3 characters");
+          if (!email.includes("@")) throw new Error("Enter a valid email");
+          if (password.length < 6) throw new Error("Password must be at least 6 characters");
+          data = await api("/api/signup", {
+            method: "POST",
+            body: JSON.stringify({ username, email, password }),
+          });
+        } else {
+          const login = document.getElementById("auth-login").value.trim();
+          const password = document.getElementById("auth-password").value;
+          if (!login || !password) throw new Error("Enter username/email and password");
+          data = await api("/api/login", {
+            method: "POST",
+            body: JSON.stringify({ login, password }),
+          });
+        }
+        authToken = data.token;
+        currentUser = data.user;
+        localStorage.setItem("ml_token", authToken);
+        setAuthUI();
+        closeAuth();
+        showLibrary();
+      } catch (e) {
+        err.textContent = e.message || "Something went wrong";
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function showSettings() {
+      showView("view-settings");
+      document.getElementById("btn-new").style.display = "none";
+      setAuthUI();
+    }
+
+    async function showAdmin() {
+      if (!currentUser || !currentUser.is_admin) {
+        alert("Admin only. Log in with an admin account.");
+        openAuth("login");
+        return;
+      }
+      showView("view-admin");
+      document.getElementById("btn-new").style.display = "none";
+      try {
+        const stats = await api("/api/admin/stats");
+        document.getElementById("admin-stats").innerHTML = `
+          <div class="stat-pill"><div class="n">${stats.users}</div><div class="l">Accounts</div></div>
+          <div class="stat-pill"><div class="n">${stats.admins}</div><div class="l">Admins</div></div>
+          <div class="stat-pill"><div class="n">${stats.active_users}</div><div class="l">Active users</div></div>
+          <div class="stat-pill"><div class="n">${stats.texts}</div><div class="l">Texts saved</div></div>
+          <div class="stat-pill"><div class="n">${stats.scores}</div><div class="l">Score attempts</div></div>
+          <div class="stat-pill"><div class="n">${stats.avg_accuracy}%</div><div class="l">Avg accuracy</div></div>
+          <div class="stat-pill"><div class="n">${stats.avg_clarity}%</div><div class="l">Avg clarity</div></div>
+        `;
+        const topBody = document.querySelector("#admin-top-users tbody");
+        topBody.innerHTML = (stats.top_users || []).map(u => `
+          <tr>
+            <td>${escapeHtml(u.username)}</td>
+            <td>${u.attempts}</td>
+            <td>${u.avg_accuracy}%</td>
+          </tr>
+        `).join("") || `<tr><td colspan="3" style="color:var(--text-muted)">No practice data yet</td></tr>`;
+
+        const recentBody = document.querySelector("#admin-recent tbody");
+        recentBody.innerHTML = (stats.recent_scores || []).map(s => `
+          <tr>
+            <td>${(s.created_at || "").replace("T", " ").slice(0, 16)}</td>
+            <td>${escapeHtml(s.username)}</td>
+            <td>${escapeHtml((s.title || "").slice(0, 40))}</td>
+            <td>${escapeHtml(s.mode || "")}</td>
+            <td>${s.accuracy}%</td>
+            <td>${s.clarity}%</td>
+          </tr>
+        `).join("") || `<tr><td colspan="6" style="color:var(--text-muted)">No scores yet</td></tr>`;
+
+        const { users } = await api("/api/admin/users");
+        const tbody = document.querySelector("#admin-users tbody");
+        tbody.innerHTML = users.map(u => `
+          <tr>
+            <td>${u.id}</td>
+            <td>${escapeHtml(u.username)}</td>
+            <td>${escapeHtml(u.email)}</td>
+            <td>${u.is_admin ? "Admin" : "User"}</td>
+            <td>${(u.created_at || "").slice(0, 10)}</td>
+            <td>${u.is_admin ? "—" : `<button class="danger-outline" onclick="adminDeleteUser(${u.id})">Delete</button>`}</td>
+          </tr>
+        `).join("");
+      } catch (e) {
+        alert(e.message);
+        goHome();
+      }
+    }
+
+    async function adminDeleteUser(id) {
+      if (!confirm("Delete this user and all their texts/scores?")) return;
+      try {
+        await api("/api/admin/users/" + id, { method: "DELETE" });
+        showAdmin();
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    async function logout() {
+      try { await api("/api/logout", { method: "POST", body: "{}" }); } catch (_) {}
+      authToken = null;
+      currentUser = null;
+      currentTextId = null;
+      localStorage.removeItem("ml_token");
+      setAuthUI();
+      goHome();
+    }
+
+    function showView(id) {
+      document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+      document.getElementById(id).classList.add("active");
+    }
+
+    function goHome() {
+      if (pacePlaying) stopPace();
+      if (isListening) stopListen();
+      showView("view-home");
+      document.getElementById("btn-new").style.display = "none";
+    }
+
+    let libraryFilter = "all";
+
+    async function showLibrary() {
+      if (!currentUser) {
+        openAuth("login");
+        return;
+      }
+      showView("view-library");
+      document.getElementById("btn-new").style.display = "inline-flex";
+      const streakEl = document.getElementById("lib-streak");
+      if (streakEl) streakEl.textContent = "Streak: " + getStreak() + " day(s)";
+      const grid = document.getElementById("library-grid");
+      grid.innerHTML = '<div class="empty-lib">Loading…</div>';
+      try {
+        let { texts } = await api("/api/texts");
+        const now = new Date().toISOString();
+        texts = texts.slice().sort((a, b) => {
+          const ad = a.next_review_at && a.next_review_at <= now ? 0 : 1;
+          const bd = b.next_review_at && b.next_review_at <= now ? 0 : 1;
+          if (ad !== bd) return ad - bd;
+          return (b.updated_at || "").localeCompare(a.updated_at || "");
+        });
+        if (libraryFilter === "due") {
+          texts = texts.filter(t => t.next_review_at && t.next_review_at <= now);
+        }
+        if (!texts.length) {
+          grid.innerHTML = libraryFilter === "due"
+            ? '<div class="empty-lib">Nothing due today. Practice anything or check back after a score.</div>'
+            : '<div class="empty-lib">No texts yet. Paste or upload one to get started.</div>';
+          return;
+        }
+        grid.innerHTML = texts.map(t => {
+          const due = t.next_review_at && t.next_review_at <= now;
+          const dueLabel = due
+            ? '<span style="color:var(--text);font-weight:600">Review due</span>'
+            : (t.next_review_at
+              ? `<span>Next review ${(t.next_review_at || "").slice(0, 10)}</span>`
+              : "");
+          return `
+          <div class="lib-card" onclick="openSavedText(${t.id})" style="${due ? "border-color:#888" : ""}">
+            <h3>${escapeHtml(t.title)}</h3>
+            <div class="lib-meta">
+              <span><strong>${t.word_count}</strong> words</span>
+              <span>Mastery <strong>${t.mastery_pct}%</strong></span>
+              <span>Best <strong>${t.best_accuracy}%</strong></span>
+              <span>${t.attempts} attempts</span>
+              ${dueLabel}
+            </div>
+            <div class="lib-actions" onclick="event.stopPropagation()">
+              <button class="primary" onclick="openSavedText(${t.id})">Open</button>
+              <button onclick="shareText(${t.id})">Share</button>
+              <button onclick="exportScores(${t.id})">Export</button>
+              <button class="danger-outline" onclick="deleteSavedText(${t.id})">Delete</button>
+            </div>
+          </div>`;
+        }).join("");
+      } catch (e) {
+        grid.innerHTML = `<div class="empty-lib">${escapeHtml(e.message)}</div>`;
+      }
+    }
+
+    async function openSavedText(id) {
+      try {
+        const data = await api("/api/texts/" + id);
+        currentTextId = data.text.id;
+        const mastered = data.progress && data.progress.mastered_chunks
+          ? JSON.parse(data.progress.mastered_chunks)
+          : [];
+        personalBest = (data.progress && data.progress.best_accuracy) || 0;
+        lastAccuracy = personalBest;
+        loadText(data.text.content, data.text.title, { skipSave: true, mastered });
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    async function deleteSavedText(id) {
+      if (!confirm("Delete this text and its scores?")) return;
+      try {
+        await api("/api/texts/" + id, { method: "DELETE" });
+        if (currentTextId === id) currentTextId = null;
+        showLibrary();
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    async function shareText(id) {
+      try {
+        const data = await api("/api/texts/" + id + "/share", { method: "POST", body: "{}" });
+        const url = location.origin + "/memorize-lab.html?share=" + data.share_token;
+        await navigator.clipboard.writeText(url).catch(() => {});
+        prompt("Share link (copied if allowed):", url);
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    async function exportScores(id) {
+      try {
+        const data = await api("/api/texts/" + id);
+        const rows = [["when", "mode", "accuracy", "coverage", "clarity"]];
+        (data.scores || []).forEach(s => {
+          rows.push([s.created_at, s.mode, s.accuracy, s.coverage, s.clarity]);
+        });
+        const csv = rows.map(r => r.join(",")).join("\n");
+        const blob = new Blob([csv], { type: "text/csv" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = (data.text.title || "scores").replace(/\W+/g, "_") + "_scores.csv";
+        a.click();
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    async function saveCurrentTextToServer(title, content) {
+      if (!currentUser) return null;
+      try {
+        const data = await api("/api/texts", {
+          method: "POST",
+          body: JSON.stringify({ title, content }),
+        });
+        currentTextId = data.id;
+        return data.id;
+      } catch (e) {
+        console.warn("save text failed", e);
+        return null;
+      }
+    }
+
+    async function persistProgress() {
+      if (!currentUser || !currentTextId) return;
+      const mastery = paragraphs.length
+        ? Math.round((masteredChunks.size / paragraphs.length) * 100)
+        : 0;
+      try {
+        await api("/api/texts/" + currentTextId + "/progress", {
+          method: "PUT",
+          body: JSON.stringify({
+            mastered_chunks: [...masteredChunks],
+            mastery_pct: mastery,
+          }),
+        });
+      } catch (e) {
+        console.warn("progress save failed", e);
+      }
+    }
+
+    async function persistScore(accuracy, coverage, clarity, mode) {
+      if (!currentUser || !currentTextId) return;
+      try {
+        await api("/api/scores", {
+          method: "POST",
+          body: JSON.stringify({
+            text_id: currentTextId,
+            accuracy,
+            coverage,
+            clarity,
+            mode,
+            mastered_chunks: [...masteredChunks],
+          }),
+        });
+      } catch (e) {
+        console.warn("score save failed", e);
+      }
+    }
+
+    // ─── State ───
+    let fullText = "";
+    let paragraphs = [];
+    let words = [];
+    let masteredChunks = new Set();
+    let recognition = null;
+    let isListening = false;
+    let finalTranscript = "";
+    let interimTranscript = "";
+
+    tryRestoreSession();
+
+    // ─── Init speech ───
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      document.getElementById("speech-notice").style.display = "block";
+    } else {
+      recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+
+      recognition.onresult = (event) => {
+        interimTranscript = "";
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const t = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += t + " ";
+          } else {
+            interimTranscript += t;
+          }
+        }
+        updateTranscriptUI();
+        updatePaceTranscriptUI();
+      };
+
+      recognition.onerror = (e) => {
+        console.warn("Speech error:", e.error);
+        if (e.error === "not-allowed") {
+          document.getElementById("voice-hint").innerHTML = "<strong>Mic blocked.</strong> Allow microphone access and try again.";
+        }
+        stopListen();
+      };
+
+      recognition.onend = () => {
+        if (isListening) {
+          // restart if still supposed to be listening
+          try { recognition.start(); } catch (_) {}
+        }
+      };
+    }
+
+    // ─── File / paste ───
+    const dropZone = document.getElementById("drop-zone");
+    const fileInput = document.getElementById("file-input");
+
+    dropZone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dropZone.classList.add("dragover");
+    });
+    dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
+    dropZone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dropZone.classList.remove("dragover");
+      const f = e.dataTransfer.files[0];
+      if (f) readFile(f);
+    });
+    fileInput.addEventListener("change", () => {
+      if (fileInput.files[0]) readFile(fileInput.files[0]);
+    });
+
+    function readFile(file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const name = file.name.replace(/\.txt$/i, "");
+        loadText(reader.result, name);
+      };
+      reader.readAsText(file);
+    }
+
+    function loadFromPaste() {
+      const t = document.getElementById("paste-input").value.trim();
+      if (!t) {
+        document.getElementById("paste-input").focus();
+        return;
+      }
+      loadText(t, "Pasted text");
+    }
+
+    async function loadText(text, title, opts = {}) {
+      fullText = text.replace(/\r\n/g, "\n").trim();
+      paragraphs = fullText.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+      if (paragraphs.length === 0) paragraphs = [fullText];
+      words = fullText.split(/\s+/).filter(Boolean);
+
+      document.getElementById("text-title").textContent = title || "Untitled";
+      document.getElementById("meta-words").textContent = words.length;
+      document.getElementById("meta-paras").textContent = paragraphs.length;
+      document.getElementById("meta-mins").textContent = Math.max(1, Math.round(words.length / 180));
+
+      masteredChunks = new Set();
+      if (opts.mastered) {
+        masteredChunks = new Set(opts.mastered);
+      } else {
+        try {
+          const saved = localStorage.getItem("ml_mastered_" + hash(fullText));
+          if (saved) masteredChunks = new Set(JSON.parse(saved));
+        } catch (_) {}
+      }
+
+      if (!opts.skipSave) {
+        currentTextId = null;
+        if (currentUser) {
+          await saveCurrentTextToServer(title || "Untitled", fullText);
+        }
+      }
+
+      renderStudy();
+      renderChunks();
+      applyHide();
+      renderPaceText();
+      document.getElementById("target-preview").textContent = fullText;
+      updateMastery();
+
+      showView("view-dash");
+      document.getElementById("btn-new").style.display = "inline-flex";
+      setMode("study");
+    }
+
+    function hash(s) {
+      let h = 0;
+      for (let i = 0; i < s.length; i++) h = ((h << 5) - h) + s.charCodeAt(i) | 0;
+      return h.toString(36);
+    }
+
+    function resetAll() {
+      if (isListening) stopListen();
+      if (pacePlaying) stopPace();
+      fullText = "";
+      paragraphs = [];
+      words = [];
+      paceWords = [];
+      paceIndex = 0;
+      masteredChunks.clear();
+      finalTranscript = "";
+      currentTextId = null;
+      document.getElementById("paste-input").value = "";
+      document.getElementById("score-grid").style.display = "none";
+      document.getElementById("btn-master").style.display = "none";
+      goHome();
+    }
+
+    // ─── Modes ───
+    function setMode(mode) {
+      document.querySelectorAll(".mode-tab").forEach(t => {
+        t.classList.toggle("active", t.dataset.mode === mode);
+      });
+      document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+      document.getElementById("panel-" + mode).classList.add("active");
+      if (mode !== "voice" && isListening) stopListen();
+      if (mode !== "pace" && pacePlaying) stopPace();
+      if (mode === "pace") {
+        renderPaceText();
+        resetPace();
+      }
+      if (mode === "train") {
+        setTrainSub(trainSub || "sentence");
+      }
+      if (mode === "study") renderStudy();
+    }
+
+    // ─── Study ───
+    function renderStudy() {
+      const el = document.getElementById("study-text");
+      const words = fullText.split(/(\s+)/);
+      el.innerHTML = paragraphs.map((p, pi) => {
+        const parts = p.split(/(\s+)/).map(part => {
+          if (!part.trim()) return escapeHtml(part);
+          const cls = lastMissWords.has(normalize(part)) ? " miss-word" : "";
+          return `<span class="study-w${cls}">${escapeHtml(part)}</span>`;
+        }).join("");
+        return `<div class="para" data-pi="${pi}">${parts}</div>`;
+      }).join("");
+      updateStudyMeta();
+    }
+
+    function updateStudyMeta() {
+      const el = document.getElementById("study-meta");
+      if (!el || !words.length) return;
+      const estRuns = Math.max(1, Math.ceil((100 - (lastAccuracy || 0)) / 15));
+      const mins = Math.max(1, Math.round(words.length / 180));
+      const streak = getStreak();
+      el.innerHTML = `~${mins} min read · ~${estRuns} solid runs to mastery (est.) · ` +
+        `Streak <strong>${streak}</strong> day${streak === 1 ? "" : "s"} · Goal: 85%+ accuracy`;
+      if (personalBest > 0) {
+        el.innerHTML += ` · Personal best <strong>${personalBest}%</strong>`;
+      }
+    }
+
+    // ─── Train modes ───
+    let trainSub = "sentence";
+    let sentenceIndex = 0;
+    let sentences = [];
+    let pathStep = 0; // 0 full, 1 hide30, 2 hide70, 3 cue-free
+    let lastMissWords = new Set();
+    let lastAccuracy = 0;
+    let personalBest = 0;
+    let drillSentences = [];
+
+    function splitSentences(text) {
+      return text.match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map(s => s.trim()).filter(Boolean) || [text];
+    }
+
+    function setTrainSub(sub) {
+      trainSub = sub;
+      document.querySelectorAll(".train-sub").forEach(b => {
+        b.classList.toggle("active", b.dataset.sub === sub);
+      });
+      sentenceIndex = 0;
+      sentences = splitSentences(fullText);
+      if (sub === "reverse") sentences = [...sentences].reverse();
+      if (sub === "drill") {
+        if (!drillSentences.length) {
+          document.getElementById("train-status").textContent =
+            "No misses yet — run a Voice test first, then open Error drill.";
+          document.getElementById("train-display").textContent = "";
+          document.getElementById("train-actions").innerHTML = "";
+          return;
+        }
+        sentences = drillSentences;
+      }
+      renderTrain();
+    }
+
+    function renderTrain() {
+      const display = document.getElementById("train-display");
+      const actions = document.getElementById("train-actions");
+      const status = document.getElementById("train-status");
+      const feedback = document.getElementById("train-feedback");
+      feedback.textContent = "";
+
+      if (trainSub === "path") {
+        const labels = ["Step 1 — Read full text", "Step 2 — Hide ~30%", "Step 3 — Hide ~70%", "Step 4 — Cue-free voice"];
+        status.textContent = labels[pathStep] + " (" + (pathStep + 1) + "/4)";
+        if (pathStep === 0) {
+          display.textContent = fullText;
+          actions.innerHTML = `<button class="primary" onclick="pathNext()">Mark read → next</button>`;
+        } else if (pathStep === 1 || pathStep === 2) {
+          const pct = pathStep === 1 ? 30 : 70;
+          display.innerHTML = buildFirstLetterOrHide(fullText, pct, false);
+          actions.innerHTML = `<button class="primary" onclick="pathNext()">I can do this → next</button>
+            <button onclick="pathStep=Math.max(0,pathStep-1);renderTrain()">Back</button>`;
+        } else {
+          display.textContent = "Hide this screen and recite from memory, then open Voice test to score.";
+          actions.innerHTML = `<button class="primary" onclick="setMode('voice')">Go to Voice test</button>
+            <button onclick="pathStep=0;renderTrain()">Restart path</button>`;
+        }
+        return;
+      }
+
+      if (trainSub === "letters") {
+        status.textContent = "First-letter cues — say the full words aloud, then reveal.";
+        display.innerHTML = buildFirstLetterOrHide(fullText, 0, true);
+        actions.innerHTML = `<button class="primary" onclick="revealLetters()">Reveal full text</button>
+          <button onclick="renderTrain()">Hide again</button>`;
+        return;
+      }
+
+      if (trainSub === "recall") {
+        if (sentenceIndex >= sentences.length) sentenceIndex = 0;
+        const prev = sentenceIndex > 0 ? sentences[sentenceIndex - 1] : "(start)";
+        const answer = sentences[sentenceIndex];
+        status.textContent = `Recall ${sentenceIndex + 1}/${sentences.length} — what comes after:`;
+        display.innerHTML = `<div style="color:var(--text-muted);margin-bottom:0.5rem">${escapeHtml(prev.slice(-80))}</div>
+          <input id="recall-input" style="width:100%;padding:0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text)" placeholder="Type the next sentence…" />`;
+        actions.innerHTML = `<button class="primary" onclick="checkRecall()">Check</button>
+          <button onclick="sentenceIndex=Math.min(sentences.length-1,sentenceIndex+1);renderTrain()">Skip</button>`;
+        return;
+      }
+
+      // sentence / reverse / drill
+      if (!sentences.length) {
+        status.textContent = "No sentences found.";
+        return;
+      }
+      if (sentenceIndex >= sentences.length) {
+        status.textContent = "All sentences done. Nice work.";
+        display.textContent = "Section complete.";
+        actions.innerHTML = `<button class="primary" onclick="sentenceIndex=0;renderTrain()">Restart</button>`;
+        return;
+      }
+      const s = sentences[sentenceIndex];
+      status.textContent = `${trainSub === "reverse" ? "Reverse" : trainSub === "drill" ? "Drill" : "Sentence"} ${sentenceIndex + 1}/${sentences.length} — unlock by typing from memory`;
+      display.innerHTML = `<div style="margin-bottom:0.5rem;color:var(--text-muted)">Memorize, hide in your mind, then type:</div>
+        <div id="train-prompt" style="margin-bottom:0.75rem">${escapeHtml(s)}</div>
+        <input id="sentence-input" style="width:100%;padding:0.7rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text)" placeholder="Type this sentence from memory…" />`;
+      actions.innerHTML = `<button onclick="document.getElementById('train-prompt').style.visibility='hidden'">Hide prompt</button>
+        <button class="primary" onclick="checkSentenceUnlock()">Check & unlock next</button>
+        <button onclick="sentenceIndex++;renderTrain()">Skip</button>`;
+    }
+
+    function buildFirstLetterOrHide(text, hidePct, lettersOnly) {
+      const tokens = text.split(/(\s+)/);
+      if (lettersOnly) {
+        return tokens.map(t => {
+          if (!t.trim()) return escapeHtml(t);
+          const clean = t.replace(/[^\w']/g, "");
+          const punct = t.slice(clean.length);
+          if (!clean) return escapeHtml(t);
+          return escapeHtml(clean[0] + "…" + punct);
+        }).join("");
+      }
+      const wordIdx = [];
+      tokens.forEach((t, i) => { if (t.trim()) wordIdx.push(i); });
+      const hideN = Math.round(wordIdx.length * (hidePct / 100));
+      const hide = new Set([...wordIdx].sort(() => Math.random() - 0.5).slice(0, hideN));
+      return tokens.map((t, i) => {
+        if (hide.has(i)) return `<span class="word-blank" style="min-width:2em">____</span>`;
+        return escapeHtml(t);
+      }).join("");
+    }
+
+    function revealLetters() {
+      document.getElementById("train-display").textContent = fullText;
+    }
+
+    function pathNext() {
+      pathStep = Math.min(3, pathStep + 1);
+      renderTrain();
+    }
+
+    function checkSentenceUnlock() {
+      const input = document.getElementById("sentence-input");
+      const target = normalize(sentences[sentenceIndex]);
+      const got = normalize(input.value || "");
+      const tw = target.split(" ").filter(Boolean);
+      const sw = got.split(" ").filter(Boolean);
+      let m = 0, si = 0;
+      for (const t of tw) {
+        for (let j = si; j < sw.length; j++) {
+          if (sw[j] === t || similarity(sw[j], t) > 0.8) { m++; si = j + 1; break; }
+        }
+      }
+      const pct = tw.length ? Math.round(m / tw.length * 100) : 0;
+      const fb = document.getElementById("train-feedback");
+      if (pct >= 80) {
+        fb.textContent = `Unlocked (${pct}%). Next sentence…`;
+        sentenceIndex++;
+        setTimeout(renderTrain, 500);
+      } else {
+        fb.textContent = `Need ~80% — you got ${pct}%. Try again or skip.`;
+      }
+    }
+
+    function checkRecall() {
+      const input = document.getElementById("recall-input");
+      const target = normalize(sentences[sentenceIndex]);
+      const got = normalize(input.value || "");
+      const tw = target.split(" ").filter(Boolean);
+      const sw = got.split(" ").filter(Boolean);
+      let m = 0, si = 0;
+      for (const t of tw) {
+        for (let j = si; j < sw.length; j++) {
+          if (sw[j] === t || similarity(sw[j], t) > 0.8) { m++; si = j + 1; break; }
+        }
+      }
+      const pct = tw.length ? Math.round(m / tw.length * 100) : 0;
+      const fb = document.getElementById("train-feedback");
+      fb.textContent = pct >= 70
+        ? `Good recall (${pct}%).`
+        : `Answer was: “${sentences[sentenceIndex]}” (${pct}% match)`;
+      if (pct >= 70) {
+        sentenceIndex++;
+        setTimeout(renderTrain, 900);
+      }
+    }
+
+    function getStreak() {
+      try {
+        const data = JSON.parse(localStorage.getItem("ml_streak") || "{}");
+        return data.count || 0;
+      } catch { return 0; }
+    }
+
+    function bumpStreak() {
+      const today = new Date().toISOString().slice(0, 10);
+      let data = {};
+      try { data = JSON.parse(localStorage.getItem("ml_streak") || "{}"); } catch {}
+      if (data.last === today) return data.count || 0;
+      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      const count = data.last === yesterday ? (data.count || 0) + 1 : 1;
+      localStorage.setItem("ml_streak", JSON.stringify({ last: today, count }));
+      return count;
+    }
+
+    function afterScoreLearning(accuracy, spokenWords, targetWords) {
+      lastAccuracy = accuracy;
+      if (accuracy > personalBest) personalBest = accuracy;
+      bumpStreak();
+      // miss words for highlight + drill
+      const spokenSet = new Set(spokenWords);
+      lastMissWords = new Set();
+      targetWords.forEach(w => {
+        if (![...spokenSet].some(s => s === w || similarity(s, w) > 0.8)) lastMissWords.add(w);
+      });
+      // drill sentences containing misses
+      drillSentences = splitSentences(fullText).filter(s => {
+        const n = normalize(s);
+        return [...lastMissWords].some(w => n.includes(w));
+      });
+      updateStudyMeta();
+      // confidence prompt
+      setTimeout(() => {
+        const c = prompt("How confident did that feel? (1 = guessing, 5 = certain)", "3");
+        if (c) {
+          try {
+            localStorage.setItem("ml_last_confidence", String(c));
+          } catch {}
+        }
+      }, 400);
+    }
+
+    function escapeHtml(s) {
+      return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    // ─── Hide words ───
+    function applyHide() {
+      const pct = parseInt(document.getElementById("hide-level").value, 10);
+      document.getElementById("hide-pct").textContent = pct + "%";
+      const el = document.getElementById("hide-text");
+      const tokens = fullText.split(/(\s+)/);
+      const wordIndices = [];
+      tokens.forEach((t, i) => {
+        if (t.trim() && !/^\s+$/.test(t)) wordIndices.push(i);
+      });
+
+      // deterministic-ish random based on pct
+      const hideCount = Math.round(wordIndices.length * (pct / 100));
+      const shuffled = [...wordIndices].sort(() => Math.random() - 0.5);
+      const toHide = new Set(shuffled.slice(0, hideCount));
+
+      el.innerHTML = tokens.map((t, i) => {
+        if (toHide.has(i)) {
+          return `<span class="word-blank" data-word="${escapeHtml(t)}" onclick="revealWord(this)">${escapeHtml(t)}</span>`;
+        }
+        return escapeHtml(t);
+      }).join("");
+    }
+
+    function revealWord(span) {
+      span.classList.add("revealed");
+    }
+
+    function revealAll() {
+      document.querySelectorAll(".word-blank").forEach(s => s.classList.add("revealed"));
+    }
+
+    // ─── Chunks ───
+    function renderChunks() {
+      const list = document.getElementById("chunks-list");
+      list.innerHTML = paragraphs.map((p, i) => {
+        const mastered = masteredChunks.has(i);
+        const preview = p.length > 120 ? p.slice(0, 120) + "…" : p;
+        return `
+          <div class="chunk-card ${mastered ? "mastered" : ""}" onclick="practiceChunk(${i})">
+            <div class="chunk-num">${i + 1}</div>
+            <div class="chunk-body">
+              <div class="chunk-preview">${escapeHtml(preview)}</div>
+              <div class="chunk-status">${mastered ? "✓ Mastered" : "Click to practice this section"}</div>
+            </div>
+          </div>`;
+      }).join("");
+    }
+
+    function practiceChunk(i) {
+      // switch to voice with that paragraph as focus
+      setMode("voice");
+      document.getElementById("target-preview").textContent = paragraphs[i];
+      document.getElementById("target-preview").classList.add("show");
+      document.getElementById("voice-hint").innerHTML =
+        `<strong>Section ${i + 1} of ${paragraphs.length}.</strong> Hide the text and recite this part only.`;
+      // store focus index for mastery
+      window._focusChunk = i;
+      clearTranscript();
+    }
+
+    function updateMastery() {
+      const pct = paragraphs.length ? Math.round((masteredChunks.size / paragraphs.length) * 100) : 0;
+      document.getElementById("mastery-pct").textContent = pct + "%";
+      document.getElementById("mastery-bar").style.width = pct + "%";
+      try {
+        localStorage.setItem("ml_mastered_" + hash(fullText), JSON.stringify([...masteredChunks]));
+      } catch (_) {}
+      renderChunks();
+      persistProgress();
+    }
+
+    function markMasteredFromVoice() {
+      if (typeof window._focusChunk === "number") {
+        masteredChunks.add(window._focusChunk);
+      } else {
+        // mark all if full text scored well
+        paragraphs.forEach((_, i) => masteredChunks.add(i));
+      }
+      updateMastery();
+      document.getElementById("btn-master").style.display = "none";
+    }
+
+    // ─── Voice ───
+    function toggleTarget() {
+      document.getElementById("target-preview").classList.toggle("show");
+    }
+
+    function toggleListen() {
+      if (!recognition) {
+        alert("Speech recognition is not supported in this browser. Use Chrome or Edge.");
+        return;
+      }
+      if (isListening) stopListen();
+      else startListen();
+    }
+
+    function startListen() {
+      finalTranscript = "";
+      interimTranscript = "";
+      isListening = true;
+      document.getElementById("mic-btn").classList.add("listening");
+      document.getElementById("voice-hint").innerHTML = "<strong>Listening…</strong> Speak clearly. Click the mic again when done.";
+      document.getElementById("btn-score").disabled = true;
+      try {
+        recognition.start();
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+
+    function stopListen() {
+      isListening = false;
+      document.getElementById("mic-btn").classList.remove("listening");
+      document.getElementById("voice-hint").innerHTML = "<strong>Stopped.</strong> Review your transcript, then score the attempt.";
+      try { recognition.stop(); } catch (_) {}
+      updateTranscriptUI();
+      document.getElementById("btn-score").disabled = !finalTranscript.trim();
+    }
+
+    function updateTranscriptUI() {
+      const box = document.getElementById("transcript-box");
+      const text = (finalTranscript + interimTranscript).trim();
+      if (!text) {
+        box.textContent = "Your speech will appear here…";
+        box.classList.remove("has-content");
+        return;
+      }
+      box.textContent = text;
+      box.classList.add("has-content");
+    }
+
+    function clearTranscript() {
+      finalTranscript = "";
+      interimTranscript = "";
+      updateTranscriptUI();
+      document.getElementById("score-grid").style.display = "none";
+      document.getElementById("btn-score").disabled = true;
+      document.getElementById("btn-master").style.display = "none";
+    }
+
+    // ─── Scoring ───
+    function normalize(s) {
+      return s
+        .toLowerCase()
+        .replace(/[^\w\s']/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function scoreSpeech() {
+      const spoken = normalize(finalTranscript);
+      const targetRaw = document.getElementById("target-preview").classList.contains("show")
+        ? document.getElementById("target-preview").textContent
+        : fullText;
+      // always score against current target preview content (or full)
+      const target = normalize(
+        document.getElementById("target-preview").textContent || fullText
+      );
+
+      if (!spoken) {
+        alert("No speech captured. Try again.");
+        return;
+      }
+
+      const targetWords = target.split(" ").filter(Boolean);
+      const spokenWords = spoken.split(" ").filter(Boolean);
+
+      // Sequence-aware match (order matters) + fuzzy tokens
+      let matched = 0;
+      let si = 0;
+      for (let ti = 0; ti < targetWords.length; ti++) {
+        const tw = targetWords[ti];
+        let found = -1;
+        const windowEnd = Math.min(spokenWords.length, si + 6);
+        for (let j = si; j < windowEnd; j++) {
+          if (spokenWords[j] === tw || similarity(spokenWords[j], tw) > 0.8) {
+            found = j;
+            break;
+          }
+        }
+        if (found >= 0) {
+          matched++;
+          si = found + 1;
+        }
+      }
+
+      const accuracy = targetWords.length ? Math.round((matched / targetWords.length) * 100) : 0;
+      const coverage = accuracy;
+      const lengthRatio = Math.min(spokenWords.length, targetWords.length) /
+        Math.max(spokenWords.length, targetWords.length || 1);
+      const clarity = Math.round(0.55 * accuracy + 0.45 * lengthRatio * 100);
+
+      // Highlight transcript
+      highlightTranscript(spokenWords, targetWords);
+
+      // UI
+      const grid = document.getElementById("score-grid");
+      grid.style.display = "grid";
+
+      setScoreCard("sc-acc", accuracy);
+      setScoreCard("sc-cov", coverage);
+      setScoreCard("sc-clr", clarity);
+      persistScore(accuracy, coverage, clarity, "voice");
+      afterScoreLearning(accuracy, spokenWords, targetWords);
+
+      const bestNote = personalBest > 0 && accuracy >= personalBest
+        ? ` New personal best (${accuracy}%).`
+        : personalBest > 0
+          ? ` Best on this text: ${personalBest}%.`
+          : "";
+      if (accuracy >= 85) {
+        document.getElementById("btn-master").style.display = "inline-flex";
+        document.getElementById("voice-hint").innerHTML =
+          "<strong>Strong recitation.</strong> You can mark as mastered." + bestNote;
+      } else if (accuracy >= 60) {
+        document.getElementById("btn-master").style.display = "none";
+        document.getElementById("voice-hint").innerHTML =
+          "<strong>Getting there.</strong> Try <em>Train → Error drill</em> on misses." + bestNote;
+      } else {
+        document.getElementById("btn-master").style.display = "none";
+        document.getElementById("voice-hint").innerHTML =
+          "<strong>Keep practicing.</strong> Use Train → Sentences, then Voice again." + bestNote;
+      }
+      renderStudy();
+    }
+
+    function setScoreCard(id, val) {
+      const card = document.getElementById(id);
+      card.querySelector(".val").textContent = val + "%";
+      card.classList.remove("good", "mid", "bad");
+      if (val >= 85) card.classList.add("good");
+      else if (val >= 60) card.classList.add("mid");
+      else card.classList.add("bad");
+    }
+
+    function similarity(a, b) {
+      if (a === b) return 1;
+      if (!a.length || !b.length) return 0;
+      // simple bigram Dice
+      const bg = s => {
+        const g = [];
+        for (let i = 0; i < s.length - 1; i++) g.push(s.slice(i, i + 2));
+        return g;
+      };
+      const A = bg(a), B = bg(b);
+      if (!A.length || !B.length) return a[0] === b[0] ? 0.5 : 0;
+      let inter = 0;
+      const Bcopy = [...B];
+      A.forEach(g => {
+        const idx = Bcopy.indexOf(g);
+        if (idx >= 0) { inter++; Bcopy.splice(idx, 1); }
+      });
+      return (2 * inter) / (A.length + B.length);
+    }
+
+    function highlightTranscript(spokenWords, targetWords) {
+      const targetSet = new Map();
+      targetWords.forEach(w => targetSet.set(w, (targetSet.get(w) || 0) + 1));
+
+      const html = spokenWords.map(w => {
+        if (targetSet.has(w) && targetSet.get(w) > 0) {
+          targetSet.set(w, targetSet.get(w) - 1);
+          return `<span class="match">${escapeHtml(w)}</span>`;
+        }
+        // fuzzy
+        let best = 0;
+        let bestW = null;
+        for (const [tw, c] of targetSet) {
+          if (c <= 0) continue;
+          const s = similarity(w, tw);
+          if (s > best) { best = s; bestW = tw; }
+        }
+        if (best > 0.75 && bestW) {
+          targetSet.set(bestW, targetSet.get(bestW) - 1);
+          return `<span class="match">${escapeHtml(w)}</span>`;
+        }
+        return `<span class="miss">${escapeHtml(w)}</span>`;
+      }).join(" ");
+
+      const box = document.getElementById("transcript-box");
+      box.innerHTML = html || "—";
+      box.classList.add("has-content");
+    }
+
+    // ─── Pace guide (bobbing ball + delivery analysis) ───
+    let paceWords = [];
+    let paceMeta = []; // { emphasize, pauseAfterMs }
+    let paceIndex = 0;
+    let pacePlaying = false;
+    let paceTimer = null;
+    let pauseAnimFrame = null;
+    let userScrolling = false;
+    let userScrollTimer = null;
+    let paceMicOn = false;
+
+    // Words that usually carry weight in spoken delivery
+    const EMPHASIS_WORDS = new Set([
+      "must","never","always","critical","important","dangerous","danger","risk",
+      "problem","crisis","urgent","truth","false","real","fake","power","control",
+      "privacy","freedom","human","intelligence","creativity","trust","vote",
+      "election","future","now","every","all","none","only","key","core","root",
+      "impact","serious","extreme","staggering","significant","entire","whole",
+      "nothing","everything","why","how","what","who","cannot","can't","won't",
+      "don't","no","yes","stop","start","change","learn","think","believe"
+    ]);
+
+    const FILLER = new Set([
+      "a","an","the","of","to","in","on","at","for","and","or","but","is","are",
+      "was","were","be","been","being","it","its","as","by","with","from","that",
+      "this","these","those","than","then","so","if","into","about","over","after"
+    ]);
+
+    function updateWpmLabel() {
+      document.getElementById("wpm-label").textContent =
+        document.getElementById("pace-wpm").value;
+    }
+
+    function analyzeWord(raw, nextRaw, isLastInPara) {
+      const clean = raw.replace(/[^\w']/g, "").toLowerCase();
+      const hasEndPunct = /[.!?…]["')\]]*$/.test(raw);
+      const hasSoftPunct = /[,;:]["')\]]*$/.test(raw);
+      const isLong = clean.length >= 7;
+      const isEmphasisDict = EMPHASIS_WORDS.has(clean);
+      const isNotFiller = clean.length > 2 && !FILLER.has(clean);
+      // Capitalized mid-stream content word (not sentence start handled loosely)
+      const looksProper = /^[A-Z][a-z]/.test(raw.replace(/^["'(]/, ""));
+
+      let emphasize = false;
+      if (isEmphasisDict) emphasize = true;
+      else if (isLong && isNotFiller) emphasize = true;
+      else if (looksProper && isNotFiller && clean.length > 3) emphasize = true;
+      // Stress the last content word before a full stop
+      if (hasEndPunct && isNotFiller) emphasize = true;
+
+      let pauseAfterMs = 0;
+      if (hasEndPunct) pauseAfterMs = 650;
+      else if (hasSoftPunct) pauseAfterMs = 320;
+      if (isLastInPara) pauseAfterMs = Math.max(pauseAfterMs, 800);
+      // Tiny hold on emphasized words so the speaker can punch them
+      const holdMs = emphasize ? 180 : 0;
+
+      return { emphasize, pauseAfterMs, holdMs };
+    }
+
+    function renderPaceText() {
+      const el = document.getElementById("pace-text");
+      const paras = fullText.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+      paceMeta = [];
+
+      el.innerHTML = paras.map(para => {
+        const tokens = para.split(/(\s+)/).filter(t => t.length);
+        const wordTokens = tokens.filter(t => t.trim() && !/^\s+$/.test(t));
+        let wordIdxInPara = 0;
+
+        const inner = tokens.map(part => {
+          if (/^\s+$/.test(part) || !part.trim()) return escapeHtml(part);
+          const isLast = wordIdxInPara === wordTokens.length - 1;
+          const next = wordTokens[wordIdxInPara + 1] || "";
+          const meta = analyzeWord(part, next, isLast);
+          paceMeta.push(meta);
+          wordIdxInPara++;
+          const cls = "pace-word" + (meta.emphasize ? " emphasize" : "");
+          return `<span class="${cls}">${escapeHtml(part)}</span>`;
+        }).join("");
+        return `<div style="margin-bottom:1.15em">${inner}</div>`;
+      }).join("");
+
+      paceWords = Array.from(el.querySelectorAll(".pace-word"));
+      paceIndex = 0;
+
+      const stage = document.getElementById("pace-stage");
+      stage.onscroll = () => {
+        if (!pacePlaying) return;
+        userScrolling = true;
+        clearTimeout(userScrollTimer);
+        userScrollTimer = setTimeout(() => { userScrolling = false; }, 900);
+      };
+    }
+
+    function msPerWord() {
+      const wpm = parseInt(document.getElementById("pace-wpm").value, 10) || 130;
+      return (60 / wpm) * 1000;
+    }
+
+    function togglePace() {
+      if (pacePlaying) stopPace();
+      else startPace();
+    }
+
+    function startPace() {
+      if (!paceWords.length) renderPaceText();
+      if (!paceWords.length) return;
+
+      pacePlaying = true;
+      userScrolling = false;
+      document.getElementById("pace-play-btn").textContent = "⏸ Pause";
+      document.getElementById("bob-ball").classList.add("visible");
+      document.getElementById("pace-status").innerHTML =
+        paceMicOn
+          ? "<strong>Speak with the ball.</strong> Stress bright words, hold pauses — voice is being captured."
+          : "<strong>Deliver with intent.</strong> Stress the bright words — hold through the pause timer. Turn on Speak along to score.";
+
+      if (paceIndex >= paceWords.length) {
+        paceIndex = 0;
+        paceWords.forEach(w => w.classList.remove("current", "done"));
+      }
+
+      // Fresh transcript each full run from the start
+      if (paceIndex === 0 && paceMicOn) {
+        finalTranscript = "";
+        interimTranscript = "";
+        updatePaceTranscriptUI();
+        document.getElementById("pace-score-grid").style.display = "none";
+      }
+
+      advancePace();
+    }
+
+    function stopPace() {
+      const wasPlaying = pacePlaying;
+      const finished = paceIndex >= paceWords.length;
+      pacePlaying = false;
+      clearTimeout(paceTimer);
+      paceTimer = null;
+      if (pauseAnimFrame) cancelAnimationFrame(pauseAnimFrame);
+      pauseAnimFrame = null;
+      hidePauseTimer();
+      document.getElementById("pace-play-btn").textContent = "▶ Play";
+      const ball = document.getElementById("bob-ball");
+      ball.classList.remove("visible", "pausing");
+      if (paceIndex > 0 && paceIndex < paceWords.length) {
+        document.getElementById("pace-status").innerHTML =
+          "<strong>Paused.</strong> Press Play to continue from here.";
+      }
+    }
+
+    function resetPace() {
+      stopPace();
+      paceIndex = 0;
+      paceWords.forEach(w => w.classList.remove("current", "done"));
+      document.getElementById("bob-ball").style.opacity = "0";
+      const stage = document.getElementById("pace-stage");
+      if (stage) stage.scrollTop = 0;
+      document.getElementById("pace-score-grid").style.display = "none";
+      document.getElementById("pace-status").innerHTML =
+        "Press <strong>Play</strong> and optionally <strong>Speak along</strong>. Follow the ball, stress bright words, hold pauses — your voice is scored at the end.";
+    }
+
+    function togglePaceMic() {
+      if (!recognition) {
+        alert("Speech recognition needs Chrome or Edge. Allow the microphone when asked.");
+        return;
+      }
+      if (paceMicOn) {
+        paceMicOn = false;
+        document.getElementById("pace-mic-btn").classList.remove("listening");
+        document.getElementById("pace-mic-btn").textContent = "🎤 Speak along";
+        // stop recognition only if the standalone voice panel isn't listening
+        if (isListening) {
+          // keep shared recognition if voice panel is also using it — but usually separate
+        }
+        stopListen();
+        document.getElementById("pace-status").innerHTML =
+          "<strong>Mic off.</strong> You can still follow the ball without scoring.";
+      } else {
+        paceMicOn = true;
+        document.getElementById("pace-voice-panel").style.display = "block";
+        document.getElementById("pace-mic-btn").classList.add("listening");
+        document.getElementById("pace-mic-btn").textContent = "⏹ Stop mic";
+        finalTranscript = "";
+        interimTranscript = "";
+        updatePaceTranscriptUI();
+        document.getElementById("pace-score-grid").style.display = "none";
+        // start listening
+        isListening = true;
+        document.getElementById("voice-hint") && (document.getElementById("voice-hint").innerHTML = "");
+        try {
+          recognition.start();
+        } catch (_) {}
+        document.getElementById("pace-status").innerHTML =
+          "<strong>Mic on.</strong> Press Play and speak with the ball — scoring runs when you finish.";
+      }
+    }
+
+    function updatePaceTranscriptUI() {
+      const box = document.getElementById("pace-transcript");
+      if (!box) return;
+      const text = (finalTranscript + interimTranscript).trim();
+      if (!text) {
+        box.textContent = "Listening for your speech…";
+        box.classList.remove("has-content");
+      } else {
+        box.textContent = text;
+        box.classList.add("has-content");
+      }
+      const btn = document.getElementById("pace-score-btn");
+      if (btn) btn.disabled = !finalTranscript.trim();
+    }
+
+    function clearPaceTranscript() {
+      finalTranscript = "";
+      interimTranscript = "";
+      updatePaceTranscriptUI();
+      document.getElementById("pace-score-grid").style.display = "none";
+    }
+
+    function scorePaceSpeech() {
+      const spoken = normalize(finalTranscript);
+      const target = normalize(fullText);
+      if (!spoken) {
+        alert("No speech captured yet. Turn on Speak along and read with the ball.");
+        return;
+      }
+
+      const targetWords = target.split(" ").filter(Boolean);
+      const spokenWords = spoken.split(" ").filter(Boolean);
+      let matched = 0;
+      const spokenUsed = new Set();
+      targetWords.forEach(tw => {
+        for (let i = 0; i < spokenWords.length; i++) {
+          if (spokenUsed.has(i)) continue;
+          if (spokenWords[i] === tw || similarity(spokenWords[i], tw) > 0.8) {
+            matched++;
+            spokenUsed.add(i);
+            break;
+          }
+        }
+      });
+
+      const accuracy = targetWords.length ? Math.round((matched / targetWords.length) * 100) : 0;
+      const coverage = accuracy;
+      const lengthRatio = Math.min(spokenWords.length, targetWords.length) /
+        Math.max(spokenWords.length, targetWords.length || 1);
+      const clarity = Math.round(0.6 * accuracy + 0.4 * lengthRatio * 100);
+
+      // Highlight in pace transcript
+      const box = document.getElementById("pace-transcript");
+      const targetSet = new Map();
+      targetWords.forEach(w => targetSet.set(w, (targetSet.get(w) || 0) + 1));
+      box.innerHTML = spokenWords.map(w => {
+        if (targetSet.has(w) && targetSet.get(w) > 0) {
+          targetSet.set(w, targetSet.get(w) - 1);
+          return `<span class="match">${escapeHtml(w)}</span>`;
+        }
+        let best = 0, bestW = null;
+        for (const [tw, c] of targetSet) {
+          if (c <= 0) continue;
+          const s = similarity(w, tw);
+          if (s > best) { best = s; bestW = tw; }
+        }
+        if (best > 0.75 && bestW) {
+          targetSet.set(bestW, targetSet.get(bestW) - 1);
+          return `<span class="match">${escapeHtml(w)}</span>`;
+        }
+        return `<span class="miss">${escapeHtml(w)}</span>`;
+      }).join(" ");
+      box.classList.add("has-content");
+
+      // Also mark missed words in the pace text
+      const spokenSet = new Set(spokenWords);
+      paceWords.forEach(el => {
+        const w = normalize(el.textContent);
+        if (!w) return;
+        if (spokenSet.has(w) || [...spokenSet].some(s => similarity(s, w) > 0.8)) {
+          el.style.outline = "none";
+        } else {
+          el.style.outline = "1px solid rgba(255,255,255,0.25)";
+          el.style.outlineOffset = "2px";
+        }
+      });
+
+      const grid = document.getElementById("pace-score-grid");
+      grid.style.display = "grid";
+      setScoreCard("pace-sc-acc", accuracy);
+      setScoreCard("pace-sc-cov", coverage);
+      setScoreCard("pace-sc-clr", clarity);
+      persistScore(accuracy, coverage, clarity, "pace");
+      afterScoreLearning(accuracy, spokenWords, targetWords);
+
+      document.getElementById("pace-status").innerHTML =
+        accuracy >= 85
+          ? "<strong>Strong delivery.</strong> Try Voice test cue-free next."
+          : accuracy >= 60
+            ? "<strong>Good progress.</strong> Use Train → Error drill on misses."
+            : "<strong>Keep going.</strong> Slow WPM or use Train → Sentences first.";
+      renderStudy();
+    }
+
+    function onPaceFinished() {
+      document.getElementById("pace-status").innerHTML =
+        "<strong>Done.</strong> " +
+        (paceMicOn && finalTranscript.trim()
+          ? "Scoring your speech…"
+          : "Reset and try again, or enable Speak along next time.");
+      if (paceMicOn && finalTranscript.trim()) {
+        // slight delay so last words can finalize in recognition
+        setTimeout(() => scorePaceSpeech(), 600);
+      }
+    }
+
+    function hidePauseTimer() {
+      const t = document.getElementById("pause-timer");
+      t.classList.remove("visible");
+      document.getElementById("bob-ball").classList.remove("pausing");
+    }
+
+    function showPauseTimer(wordEl, durationMs) {
+      return new Promise(resolve => {
+        if (!pacePlaying || durationMs < 80) {
+          resolve();
+          return;
+        }
+        const stage = document.getElementById("pace-stage");
+        const timer = document.getElementById("pause-timer");
+        const ring = document.getElementById("pause-ring");
+        const secs = document.getElementById("pause-secs");
+        const ball = document.getElementById("bob-ball");
+
+        const stageRect = stage.getBoundingClientRect();
+        const wordRect = wordEl.getBoundingClientRect();
+        const left = wordRect.left - stageRect.left + stage.scrollLeft + wordRect.width / 2;
+        const top = wordRect.top - stageRect.top + stage.scrollTop - 8;
+
+        timer.style.left = left + "px";
+        timer.style.top = top + "px";
+        timer.classList.add("visible");
+        ball.classList.add("pausing");
+
+        const start = performance.now();
+        function tick(now) {
+          if (!pacePlaying) {
+            hidePauseTimer();
+            resolve();
+            return;
+          }
+          const elapsed = now - start;
+          const remain = Math.max(0, durationMs - elapsed);
+          const pct = ((durationMs - remain) / durationMs) * 100;
+          ring.style.setProperty("--pct", pct + "%");
+          secs.textContent = (remain / 1000).toFixed(1);
+          if (remain <= 0) {
+            hidePauseTimer();
+            resolve();
+            return;
+          }
+          pauseAnimFrame = requestAnimationFrame(tick);
+        }
+        pauseAnimFrame = requestAnimationFrame(tick);
+      });
+    }
+
+    async function advancePace() {
+      if (!pacePlaying) return;
+
+      paceWords.forEach(w => w.classList.remove("current"));
+
+      if (paceIndex >= paceWords.length) {
+        paceWords.forEach(w => w.classList.add("done"));
+        stopPace();
+        onPaceFinished();
+        return;
+      }
+
+      const wordEl = paceWords[paceIndex];
+      const meta = paceMeta[paceIndex] || { emphasize: false, pauseAfterMs: 0, holdMs: 0 };
+      wordEl.classList.add("current");
+      // re-trigger shake for emphasized words
+      if (meta.emphasize) {
+        wordEl.classList.remove("emphasize");
+        void wordEl.offsetWidth;
+        wordEl.classList.add("emphasize");
+      }
+      for (let i = 0; i < paceIndex; i++) {
+        paceWords[i].classList.add("done");
+        paceWords[i].classList.remove("current");
+      }
+
+      moveBallTo(wordEl);
+      if (!userScrolling) scrollWordIntoStage(wordEl);
+
+      const base = msPerWord();
+      const dwell = base + (meta.holdMs || 0);
+
+      // Speak the word for `dwell`, then optional pause
+      await new Promise(r => {
+        paceTimer = setTimeout(r, dwell);
+      });
+      if (!pacePlaying) return;
+
+      if (meta.pauseAfterMs > 0) {
+        await showPauseTimer(wordEl, meta.pauseAfterMs);
+        if (!pacePlaying) return;
+      }
+
+      paceIndex++;
+      advancePace();
+    }
+
+    function scrollWordIntoStage(wordEl) {
+      const stage = document.getElementById("pace-stage");
+      const stageRect = stage.getBoundingClientRect();
+      const wordRect = wordEl.getBoundingClientRect();
+      const pad = 48;
+
+      const wordTopInContent = wordRect.top - stageRect.top + stage.scrollTop;
+      const wordBottomInContent = wordTopInContent + wordRect.height;
+      const viewTop = stage.scrollTop;
+      const viewBottom = viewTop + stage.clientHeight;
+
+      if (wordTopInContent < viewTop + pad) {
+        stage.scrollTop = Math.max(0, wordTopInContent - pad);
+      } else if (wordBottomInContent > viewBottom - pad) {
+        stage.scrollTop = wordBottomInContent - stage.clientHeight + pad;
+      }
+    }
+
+    function moveBallTo(wordEl) {
+      const stage = document.getElementById("pace-stage");
+      const ball = document.getElementById("bob-ball");
+      const stageRect = stage.getBoundingClientRect();
+      const wordRect = wordEl.getBoundingClientRect();
+
+      const left = wordRect.left - stageRect.left + stage.scrollLeft + wordRect.width / 2;
+      const top = wordRect.top - stageRect.top + stage.scrollTop;
+
+      ball.style.left = left + "px";
+      ball.style.top = top + "px";
+      ball.classList.add("visible");
+    }
+
+    window.addEventListener("resize", () => {
+      if (pacePlaying && paceIndex > 0 && paceWords[paceIndex - 1]) {
+        moveBallTo(paceWords[paceIndex - 1]);
+      }
+    });
+
+    document.addEventListener("pointermove", (e) => {
+      const btn = e.target.closest("button, .btn");
+      if (!btn) return;
+      const r = btn.getBoundingClientRect();
+      btn.style.setProperty("--mx", ((e.clientX - r.left) / r.width * 100) + "%");
+      btn.style.setProperty("--my", ((e.clientY - r.top) / r.height * 100) + "%");
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener("keydown", (e) => {
+      const tag = (e.target && e.target.tagName) || "";
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (e.code === "Space" && document.getElementById("panel-pace")?.classList.contains("active")) {
+        e.preventDefault();
+        togglePace();
+      } else if (e.key === "m" || e.key === "M") {
+        if (document.getElementById("panel-pace")?.classList.contains("active")) {
+          e.preventDefault();
+          togglePaceMic();
+        }
+      } else if (e.key === "r" || e.key === "R") {
+        if (document.getElementById("panel-pace")?.classList.contains("active")) {
+          resetPace();
+        }
+      } else if (e.key === "?") {
+        showSettings();
+      }
+    });
+
+    // Open shared text from ?share=TOKEN
+    (async function loadShareFromQuery() {
+      const params = new URLSearchParams(location.search);
+      const token = params.get("share");
+      if (!token) return;
+      try {
+        const data = await api("/api/share/" + encodeURIComponent(token));
+        loadText(data.content, data.title || "Shared text", { skipSave: true });
+      } catch (e) {
+        console.warn("share load failed", e);
+      }
+    })();
+
+    // One-time onboarding
+    if (!localStorage.getItem("ml_onboarded")) {
+      setTimeout(() => {
+        if (!localStorage.getItem("ml_onboarded")) {
+          alert("Welcome to Memorize Lab\n\n1. Paste any text\n2. Use Pace guide + Speak along\n3. Sign up to save your library\n\nPress ? anytime for shortcuts.");
+          localStorage.setItem("ml_onboarded", "1");
+        }
+      }, 600);
+    }
+  </script>
+</body>
+</html>
