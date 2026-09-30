@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: memorize-lab
+    runtime: python
+    plan: free
+    buildCommand: "true"
+    startCommand: python backend/server.py
+    envVars:
+      - key: ML_STATIC_DIR
+        value: .
+      - key: ML_DB_PATH
+        value: /opt/render/project/src/backend/memorize.db
